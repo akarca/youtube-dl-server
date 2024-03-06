@@ -35,7 +35,7 @@ Just navigate to `http://{{host}}:8080/youtube-dl` and enter the requested `{{ur
 Add the following bookmarklet to your bookmark bar so you can conviently send the current page url to your youtube-dl-server instance.
 
 ```javascript
-javascript:!function(){fetch("http://${host}:8123/youtube-dl/q?url=" + window.location.href)}();
+javascript:!function(){window.location="http://${host}:8123/youtube-dl/q?url=" + window.location.href}();
 ```
 
 ## Implementation
