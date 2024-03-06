@@ -1,15 +1,14 @@
-import sys
 import subprocess
+import sys
 
-from starlette.status import HTTP_303_SEE_OTHER
 from starlette.applications import Starlette
+from starlette.background import BackgroundTask
 from starlette.config import Config
-from starlette.staticfiles import StaticFiles
 from starlette.responses import JSONResponse, RedirectResponse
 from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
+from starlette.status import HTTP_303_SEE_OTHER
 from starlette.templating import Jinja2Templates
-from starlette.background import BackgroundTask
-
 from yt_dlp import YoutubeDL, version
 
 templates = Jinja2Templates(directory="templates")
@@ -20,7 +19,9 @@ app_defaults = {
     "YDL_EXTRACT_AUDIO_FORMAT": config("YDL_EXTRACT_AUDIO_FORMAT", default=None),
     "YDL_EXTRACT_AUDIO_QUALITY": config("YDL_EXTRACT_AUDIO_QUALITY", cast=str, default="192"),
     "YDL_RECODE_VIDEO_FORMAT": config("YDL_RECODE_VIDEO_FORMAT", default=None),
-    "YDL_OUTPUT_TEMPLATE": config("YDL_OUTPUT_TEMPLATE", cast=str, default="/youtube-dl/%(title).200s [%(id)s].%(ext)s"),
+    "YDL_OUTPUT_TEMPLATE": config(
+        "YDL_OUTPUT_TEMPLATE", cast=str, default="/youtube-dl/%(title).200s [%(id)s].%(ext)s"
+    ),
     "YDL_ARCHIVE_FILE": config("YDL_ARCHIVE_FILE", default=None),
     "YDL_UPDATE_TIME": config("YDL_UPDATE_TIME", cast=bool, default=True),
 }
@@ -35,27 +36,16 @@ async def redirect(request):
 
 
 async def q_put(request):
-    form = await request.form()
-    url = form.get("url").strip()
-    ui = form.get("ui")
-    options = {"format": form.get("format")}
+    url = request.query_params["url"].strip()
 
     if not url:
-        return JSONResponse(
-            {"success": False, "error": "/q called without a 'url' in form data"}
-        )
+        return JSONResponse({"success": False, "error": "/q called without a 'url' in form data"})
 
-    task = BackgroundTask(download, url, options)
+    task = BackgroundTask(download, url, {"format": "m4a"})
 
     print("Added url " + url + " to the download queue")
 
-    if not ui:
-        return JSONResponse(
-            {"success": True, "url": url, "options": options}, background=task
-        )
-    return RedirectResponse(
-        url="/youtube-dl?added=" + url, status_code=HTTP_303_SEE_OTHER, background=task
-    )
+    return JSONResponse({"success": True, "url": url}, background=task)
 
 
 async def update_route(scope, receive, send):
@@ -66,9 +56,7 @@ async def update_route(scope, receive, send):
 
 def update():
     try:
-        output = subprocess.check_output(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"]
-        )
+        output = subprocess.check_output([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
 
         print(output.decode("utf-8"))
     except subprocess.CalledProcessError as e:
@@ -128,7 +116,7 @@ def download(url, request_options):
 routes = [
     Route("/", endpoint=redirect),
     Route("/youtube-dl", endpoint=dl_queue_list),
-    Route("/youtube-dl/q", endpoint=q_put, methods=["POST"]),
+    Route("/youtube-dl/q", endpoint=q_put, methods=["GET"]),
     Route("/youtube-dl/update", endpoint=update_route, methods=["PUT"]),
 ]
 
