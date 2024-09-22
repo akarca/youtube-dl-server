@@ -17,10 +17,14 @@ config = Config(".env")
 app_defaults = {
     "YDL_FORMAT": config("YDL_FORMAT", cast=str, default="bestvideo+bestaudio/best"),
     "YDL_EXTRACT_AUDIO_FORMAT": config("YDL_EXTRACT_AUDIO_FORMAT", default=None),
-    "YDL_EXTRACT_AUDIO_QUALITY": config("YDL_EXTRACT_AUDIO_QUALITY", cast=str, default="192"),
+    "YDL_EXTRACT_AUDIO_QUALITY": config(
+        "YDL_EXTRACT_AUDIO_QUALITY", cast=str, default="192"
+    ),
     "YDL_RECODE_VIDEO_FORMAT": config("YDL_RECODE_VIDEO_FORMAT", default=None),
     "YDL_OUTPUT_TEMPLATE": config(
-        "YDL_OUTPUT_TEMPLATE", cast=str, default="/youtube-dl/%(title).200s [%(id)s].%(ext)s"
+        "YDL_OUTPUT_TEMPLATE",
+        cast=str,
+        default="/youtube-dl/%(title).200s [%(id)s].%(ext)s",
     ),
     "YDL_ARCHIVE_FILE": config("YDL_ARCHIVE_FILE", default=None),
     "YDL_UPDATE_TIME": config("YDL_UPDATE_TIME", cast=bool, default=True),
@@ -28,7 +32,9 @@ app_defaults = {
 
 
 async def dl_queue_list(request):
-    return templates.TemplateResponse("index.html", {"request": request, "ytdlp_version": version.__version__})
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "ytdlp_version": version.__version__}
+    )
 
 
 async def redirect(request):
@@ -39,7 +45,9 @@ async def q_put(request):
     url = request.query_params["url"].strip()
 
     if not url:
-        return JSONResponse({"success": False, "error": "/q called without a 'url' in form data"})
+        return JSONResponse(
+            {"success": False, "error": "/q called without a 'url' in form data"}
+        )
 
     task = BackgroundTask(download, url, {"format": "m4a"})
 
@@ -56,7 +64,9 @@ async def update_route(scope, receive, send):
 
 def update():
     try:
-        output = subprocess.check_output([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
+        output = subprocess.check_output(
+            [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"]
+        )
 
         print(output.decode("utf-8"))
     except subprocess.CalledProcessError as e:
@@ -100,6 +110,7 @@ def get_ydl_options(request_options):
         )
 
     return {
+        "cookies": "cookies.txt",
         "format": ydl_vars["YDL_FORMAT"],
         "postprocessors": postprocessors,
         "outtmpl": ydl_vars["YDL_OUTPUT_TEMPLATE"],
@@ -122,5 +133,5 @@ routes = [
 
 app = Starlette(debug=True, routes=routes)
 
-print("Updating youtube-dl to the newest version")
-update()
+# print("Updating youtube-dl to the newest version")
+# update()
