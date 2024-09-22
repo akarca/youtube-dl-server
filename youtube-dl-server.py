@@ -110,7 +110,7 @@ def get_ydl_options(request_options):
         )
 
     return {
-        "cookies": "cookies.txt",
+        "cookiefile": "cookies.txt",
         "format": ydl_vars["YDL_FORMAT"],
         "postprocessors": postprocessors,
         "outtmpl": ydl_vars["YDL_OUTPUT_TEMPLATE"],
