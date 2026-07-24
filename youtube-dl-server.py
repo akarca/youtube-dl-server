@@ -70,6 +70,7 @@ async def q_put(request: Request) -> JSONResponse:
 routes = [
     Route("/", endpoint=index),
     Route("/healthz", endpoint=healthz),
+    Route("/youtube-dl/q", endpoint=q_put, methods=["GET"]),
     Route("/q", endpoint=q_put, methods=["GET"]),
 ]
 
