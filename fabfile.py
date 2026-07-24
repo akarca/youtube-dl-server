@@ -28,7 +28,14 @@ def setup(c):
         print("deno already installed at %s" % DENO_PATH)
     else:
         print("Installing deno...")
-        c.run("curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/root/.deno sh -s -- -y")
+        c.run(
+            "mkdir -p /root/.deno/bin && "
+            "curl -fsSL -o /tmp/deno.zip "
+            "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip && "
+            "python3 -m zipfile -e /tmp/deno.zip /root/.deno/bin && "
+            "chmod +x /root/.deno/bin/deno && "
+            "rm /tmp/deno.zip"
+        )
         print("deno installed")
 
     if c.run("test -f %s" % YT_DLP_CONFIG_PATH, hide=True, warn=True).ok:
