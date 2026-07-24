@@ -1,3 +1,4 @@
 starlette>=0.41
 uvicorn[standard]>=0.32
 yt-dlp>=2025.1.1
+fabric>=3.0
