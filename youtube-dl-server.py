@@ -1,136 +1,76 @@
-import subprocess
-import sys
+import os
+from pathlib import Path
 
 from starlette.applications import Starlette
 from starlette.background import BackgroundTask
-from starlette.config import Config
-from starlette.responses import JSONResponse, RedirectResponse
-from starlette.routing import Mount, Route
-from starlette.staticfiles import StaticFiles
-from starlette.status import HTTP_303_SEE_OTHER
-from starlette.templating import Jinja2Templates
-from yt_dlp import YoutubeDL, version
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Route
+from yt_dlp import YoutubeDL
+from yt_dlp import version as yt_dlp_version
 
-templates = Jinja2Templates(directory="templates")
-config = Config(".env")
-
-app_defaults = {
-    "YDL_FORMAT": config("YDL_FORMAT", cast=str, default="bestvideo+bestaudio/best"),
-    "YDL_EXTRACT_AUDIO_FORMAT": config("YDL_EXTRACT_AUDIO_FORMAT", default=None),
-    "YDL_EXTRACT_AUDIO_QUALITY": config(
-        "YDL_EXTRACT_AUDIO_QUALITY", cast=str, default="192"
-    ),
-    "YDL_RECODE_VIDEO_FORMAT": config("YDL_RECODE_VIDEO_FORMAT", default=None),
-    "YDL_OUTPUT_TEMPLATE": config(
-        "YDL_OUTPUT_TEMPLATE",
-        cast=str,
-        default="/youtube-dl/%(title).200s [%(id)s].%(ext)s",
-    ),
-    "YDL_ARCHIVE_FILE": config("YDL_ARCHIVE_FILE", default=None),
-    "YDL_UPDATE_TIME": config("YDL_UPDATE_TIME", cast=bool, default=True),
-}
+COOKIES_PATH = "/root/web/cookies.txt"
+OUTPUT_DIR = "/root/music"
+OUTPUT_TEMPLATE = f"{OUTPUT_DIR}/%(title).200s [%(id)s].%(ext)s"
 
 
-async def dl_queue_list(request):
-    return templates.TemplateResponse(
-        "index.html", {"request": request, "ytdlp_version": version.__version__}
+def build_ydl_options() -> dict:
+    options: dict = {
+        "format": "bestaudio/best",
+        "outtmpl": OUTPUT_TEMPLATE,
+        "noplaylist": True,
+        "updatetime": False,
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }
+        ],
+    }
+    if os.path.isfile(COOKIES_PATH):
+        options["cookiefile"] = COOKIES_PATH
+    return options
+
+
+def download(url: str) -> None:
+    options = build_ydl_options()
+    print(f"[download] starting url={url} options={options}")
+    Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    with YoutubeDL(options) as ydl:
+        ydl.download([url])
+    print(f"[download] done url={url}")
+
+
+async def index(request: Request) -> JSONResponse:
+    return JSONResponse(
+        {
+            "service": "youtube-dl-server",
+            "yt_dlp_version": yt_dlp_version.__version__,
+        }
     )
 
 
-async def redirect(request):
-    return RedirectResponse(url="/youtube-dl")
+async def healthz(request: Request) -> JSONResponse:
+    return JSONResponse({"ok": True})
 
 
-async def q_put(request):
-    url = request.query_params["url"].strip()
-
+async def q_put(request: Request) -> JSONResponse:
+    url = request.query_params.get("url", "").strip()
     if not url:
         return JSONResponse(
-            {"success": False, "error": "/q called without a 'url' in form data"}
+            {"success": False, "error": "missing url"},
+            status_code=400,
         )
-
-    task = BackgroundTask(download, url, {"format": "m4a"})
-
-    print("Added url " + url + " to the download queue")
-
+    print(f"[q] enqueued url={url}")
+    task = BackgroundTask(download, url)
     return JSONResponse({"success": True, "url": url}, background=task)
 
 
-async def update_route(scope, receive, send):
-    task = BackgroundTask(update)
-
-    return JSONResponse({"output": "Initiated package update"}, background=task)
-
-
-def update():
-    try:
-        output = subprocess.check_output(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"]
-        )
-
-        print(output.decode("utf-8"))
-    except subprocess.CalledProcessError as e:
-        print(e.output)
-
-
-def get_ydl_options(request_options):
-    request_vars = {
-        "YDL_EXTRACT_AUDIO_FORMAT": None,
-        "YDL_RECODE_VIDEO_FORMAT": None,
-    }
-
-    requested_format = request_options.get("format", "bestvideo")
-
-    if requested_format in ["aac", "flac", "mp3", "m4a", "opus", "vorbis", "wav"]:
-        request_vars["YDL_EXTRACT_AUDIO_FORMAT"] = requested_format
-    elif requested_format == "bestaudio":
-        request_vars["YDL_EXTRACT_AUDIO_FORMAT"] = "best"
-    elif requested_format in ["mp4", "flv", "webm", "ogg", "mkv", "avi"]:
-        request_vars["YDL_RECODE_VIDEO_FORMAT"] = requested_format
-
-    ydl_vars = app_defaults | request_vars
-
-    postprocessors = []
-
-    if ydl_vars["YDL_EXTRACT_AUDIO_FORMAT"]:
-        postprocessors.append(
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": ydl_vars["YDL_EXTRACT_AUDIO_FORMAT"],
-                "preferredquality": ydl_vars["YDL_EXTRACT_AUDIO_QUALITY"],
-            }
-        )
-
-    if ydl_vars["YDL_RECODE_VIDEO_FORMAT"]:
-        postprocessors.append(
-            {
-                "key": "FFmpegVideoConvertor",
-                "preferedformat": ydl_vars["YDL_RECODE_VIDEO_FORMAT"],
-            }
-        )
-
-    return {
-        "cookiefile": "/root/web/cookies.txt",
-        "format": ydl_vars["YDL_FORMAT"],
-        "postprocessors": postprocessors,
-        "outtmpl": ydl_vars["YDL_OUTPUT_TEMPLATE"],
-        "download_archive": ydl_vars["YDL_ARCHIVE_FILE"],
-        "updatetime": ydl_vars["YDL_UPDATE_TIME"] == "True",
-    }
-
-
-def download(url, request_options):
-    options = get_ydl_options(request_options)
-    print("Options: %s" % options)
-    with YoutubeDL(options) as ydl:
-        ydl.download([url])
-
-
 routes = [
-    Route("/", endpoint=redirect),
-    Route("/youtube-dl", endpoint=dl_queue_list),
-    Route("/youtube-dl/q", endpoint=q_put, methods=["GET"]),
-    Route("/youtube-dl/update", endpoint=update_route, methods=["PUT"]),
+    Route("/", endpoint=index),
+    Route("/healthz", endpoint=healthz),
+    Route("/q", endpoint=q_put, methods=["GET"]),
 ]
 
-app = Starlette(debug=True, routes=routes)
+app = Starlette(debug=False, routes=routes)
