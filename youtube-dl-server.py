@@ -110,7 +110,7 @@ def get_ydl_options(request_options):
         )
 
     return {
-        "cookies": "cookies.txt",
+        "cookiefile": "/root/web/cookies.txt",
         "format": ydl_vars["YDL_FORMAT"],
         "postprocessors": postprocessors,
         "outtmpl": ydl_vars["YDL_OUTPUT_TEMPLATE"],
@@ -120,7 +120,9 @@ def get_ydl_options(request_options):
 
 
 def download(url, request_options):
-    with YoutubeDL(get_ydl_options(request_options)) as ydl:
+    options = get_ydl_options(request_options)
+    print("Options: %s" % options)
+    with YoutubeDL(options) as ydl:
         ydl.download([url])
 
 
@@ -132,6 +134,3 @@ routes = [
 ]
 
 app = Starlette(debug=True, routes=routes)
-
-# print("Updating youtube-dl to the newest version")
-# update()
