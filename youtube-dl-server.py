@@ -12,6 +12,7 @@ from yt_dlp import version as yt_dlp_version
 COOKIES_PATH = "/root/web/cookies.txt"
 OUTPUT_DIR = "/root/music"
 OUTPUT_TEMPLATE = f"{OUTPUT_DIR}/%(title).200s [%(id)s].%(ext)s"
+DENO_PATH = "/root/.deno/bin/deno"
 
 
 def build_ydl_options() -> dict:
@@ -20,6 +21,8 @@ def build_ydl_options() -> dict:
         "outtmpl": OUTPUT_TEMPLATE,
         "noplaylist": True,
         "updatetime": False,
+        "js_runtimes": {"deno": {"path": DENO_PATH}},
+        "remote_components": {"ejs:github"},
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
