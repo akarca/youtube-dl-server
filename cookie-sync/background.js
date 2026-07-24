@@ -1,5 +1,5 @@
 const SERVER_URL = "https://youtubedl.nameocean.org/youtube-dl/cookies";
-const TOKEN = "PLACEHOLDER_TOKEN";
+const TOKEN = "Kgueb5a-g4dbdHz_PoMTEbONKgkuJy1Y9yHMCa1YjyA";
 const INTERVAL_MINUTES = 1;
 
 async function syncCookies() {
